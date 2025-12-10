@@ -376,7 +376,7 @@
         <span class="badge">Sin tic</span>
       </h2>
       <p class="section-description">
-        Tareas sin marcar de cualquier día. Puedes pasarlas al día actual para reagendar.
+        Tareas sin marcar de días anteriores. Puedes pasarlas al día actual para reagendar.
       </p>
       <div class="items-list" id="backlog-list"></div>
     </section>
@@ -428,7 +428,6 @@
           </form>
           <div class="items-list" id="pill-template-list"></div>
         </details>
-
       </section>
 
       <!-- Limpieza -->
@@ -653,7 +652,7 @@
         text: tpl.text,
         time: tpl.time || "",
         done: false,
-        fromTemplate: true, // <- marcar como generadas desde plantilla
+        fromTemplate: true,
       }));
 
       pillTemplateAppliedDates.push(dateKey);
@@ -745,10 +744,10 @@
         actions.className = "backlog-actions";
 
         const deleteBtn = document.createElement("button");
-          deleteBtn.type = "button";
-          deleteBtn.className = "pill-template-delete";
-          deleteBtn.dataset.id = String(item.id);
-          deleteBtn.textContent = "Quitar";
+        deleteBtn.type = "button";
+        deleteBtn.className = "pill-template-delete";
+        deleteBtn.dataset.id = String(item.id);
+        deleteBtn.textContent = "Quitar";
 
         actions.appendChild(deleteBtn);
 
@@ -800,48 +799,35 @@
       return /^\d{4}-\d{2}-\d{2}$/.test(key);
     }
 
-function gatherBacklog() {
-  const pending = [];
-  const today = todayISO();
+    function gatherBacklog() {
+      const pending = [];
+      const today = todayISO();
 
-  for (const [dateKey, dayData] of Object.entries(plannerData)) {
-    if (!isDateKey(dateKey)) continue;
+      for (const [dateKey, dayData] of Object.entries(plannerData)) {
+        if (!isDateKey(dateKey)) continue;
 
-    // SOLO días pasados → excluir hoy y días futuros
-    if (dateKey >= today) continue;
+        // Solo días pasados: excluir hoy y futuros
+        if (dateKey >= today) continue;
 
-    ensureDateStructure(dateKey);
-    const sections = dayData.sections || {};
+        ensureDateStructure(dateKey);
+        const sections = dayData.sections || {};
 
-    ALL_SECTIONS.forEach((sectionId) => {
-      const list = sections[sectionId] || [];
-      list.forEach((item) => {
-        if (item.done) return;
+        ALL_SECTIONS.forEach((sectionId) => {
+          const list = sections[sectionId] || [];
+          list.forEach((item) => {
+            if (item.done) return;
 
-        // Excluir pastillas generadas por plantilla
-        if (sectionId === "pills" && item.fromTemplate) return;
+            // Excluir pastillas generadas por plantilla
+            if (sectionId === "pills" && item.fromTemplate) return;
 
-        pending.push({
-          dateKey,
-          sectionId,
-          item,
+            pending.push({
+              dateKey,
+              sectionId,
+              item,
+            });
+          });
         });
-      });
-    });
-  }
-
-  pending.sort((a, b) => {
-    if (a.dateKey !== b.dateKey) {
-      return a.dateKey.localeCompare(b.dateKey);
-    }
-    const ta = a.item.time || "";
-    const tb = b.item.time || "";
-    return ta.localeCompare(tb);
-  });
-
-  return pending;
-}
-
+      }
 
       pending.sort((a, b) => {
         if (a.dateKey !== b.dateKey) {
@@ -1060,4 +1046,3 @@ function gatherBacklog() {
   </script>
 </body>
 </html>
-
