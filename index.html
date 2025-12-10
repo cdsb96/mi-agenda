@@ -410,6 +410,25 @@
           <button type="submit">Añadir</button>
         </form>
         <div class="items-list" data-section="pills"></div>
+        <details class="mini-guide" id="pill-template-block">
+          <summary>Plantilla diaria de pastillas (opcional)</summary>
+          <p class="section-description">
+            Lo que pongas aquí aparecerá automáticamente en cada día nuevo. Solo se guarda en este dispositivo.
+          </p>
+          <form class="add-form" id="pill-template-form">
+            <input
+              type="text"
+              class="item-text"
+              id="pill-template-text"
+              placeholder="Ej: Ontozry mañana"
+              required
+            />
+            <input type="time" class="item-time" id="pill-template-time" />
+            <button type="submit">Añadir a plantilla</button>
+          </form>
+          <div class="items-list" id="pill-template-list"></div>
+        </details>
+
       </section>
 
       <!-- Limpieza -->
@@ -516,6 +535,35 @@
       trufa: "Trufa (perro)",
     };
 
+    const PILL_TEMPLATE_KEY = "mi-agenda-pill-template-v1";
+    const PILL_TEMPLATE_APPLIED_KEY = "mi-agenda-pill-template-applied-v1";
+
+    function loadJson(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch (e) {
+        return fallback;
+      }
+    }
+
+    let pillTemplate = loadJson(PILL_TEMPLATE_KEY, []);
+    let pillTemplateAppliedDates = loadJson(PILL_TEMPLATE_APPLIED_KEY, []);
+
+    function savePillTemplate() {
+      try {
+        localStorage.setItem(PILL_TEMPLATE_KEY, JSON.stringify(pillTemplate));
+      } catch (e) {}
+    }
+
+    function savePillTemplateApplied() {
+      try {
+        localStorage.setItem(
+          PILL_TEMPLATE_APPLIED_KEY,
+          JSON.stringify(pillTemplateAppliedDates)
+        );
+      } catch (e) {}
+    }
     function loadFromStorage() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -584,6 +632,34 @@
       }
     }
 
+      function applyPillTemplate(dateKey) {
+      if (!pillTemplate.length) return;
+
+      if (pillTemplateAppliedDates.includes(dateKey)) return;
+
+      ensureDateStructure(dateKey);
+      const day = plannerData[dateKey];
+
+      // Si ya hay pastillas escritas, no machacamos nada
+      if (day.sections.pills && day.sections.pills.length > 0) {
+        pillTemplateAppliedDates.push(dateKey);
+        savePillTemplateApplied();
+        return;
+      }
+
+      const now = Date.now();
+      day.sections.pills = pillTemplate.map((tpl, index) => ({
+        id: now + index + Math.random(),
+        text: tpl.text,
+        time: tpl.time || "",
+        done: false,
+      }));
+
+      pillTemplateAppliedDates.push(dateKey);
+      savePillTemplateApplied();
+      saveToStorage();
+    }
+
     function renderSection(sectionId) {
       const dateKey = getCurrentDateKey();
       ensureDateStructure(dateKey);
@@ -628,6 +704,95 @@
         row.appendChild(label);
         container.appendChild(row);
       });
+    }
+
+    function renderPillTemplate() {
+      const container = document.getElementById("pill-template-list");
+      if (!container) return;
+
+      container.innerHTML = "";
+
+      if (!pillTemplate.length) {
+        const p = document.createElement("p");
+        p.className = "backlog-empty";
+        p.textContent = "No hay nada en la plantilla todavía.";
+        container.appendChild(p);
+        return;
+      }
+
+      pillTemplate.forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "item-row";
+
+        const label = document.createElement("div");
+        label.className = "item-label";
+
+        const textSpan = document.createElement("span");
+        textSpan.className = "item-text-display";
+        textSpan.textContent = item.text;
+
+        label.appendChild(textSpan);
+
+        if (item.time) {
+          const timeSpan = document.createElement("span");
+          timeSpan.className = "item-time-display";
+          timeSpan.textContent = item.time;
+          label.appendChild(timeSpan);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "backlog-actions";
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "pill-template-delete";
+        deleteBtn.dataset.id = String(item.id);
+        deleteBtn.textContent = "Quitar";
+
+        actions.appendChild(deleteBtn);
+
+        row.appendChild(label);
+        row.appendChild(actions);
+
+        container.appendChild(row);
+      });
+    }
+
+    function handlePillTemplateAdd(event) {
+      event.preventDefault();
+      const textInput = document.getElementById("pill-template-text");
+      const timeInput = document.getElementById("pill-template-time");
+
+      const text = textInput.value.trim();
+      const time = timeInput.value;
+
+      if (!text) return;
+
+      const newItem = {
+        id: Date.now() + Math.random(),
+        text,
+        time: time || "",
+      };
+
+      pillTemplate.push(newItem);
+      savePillTemplate();
+      textInput.value = "";
+      timeInput.value = "";
+
+      renderPillTemplate();
+    }
+
+    function handlePillTemplateClick(event) {
+      const btn = event.target.closest(".pill-template-delete");
+      if (!btn) return;
+
+      const id = btn.dataset.id;
+      const index = pillTemplate.findIndex((it) => String(it.id) === String(id));
+      if (index === -1) return;
+
+      pillTemplate.splice(index, 1);
+      savePillTemplate();
+      renderPillTemplate();
     }
 
     function isDateKey(key) {
@@ -741,15 +906,17 @@
     }
 
     function renderAll() {
-      const sections = ALL_SECTIONS;
-      sections.forEach(renderSection);
-
       const dateKey = getCurrentDateKey();
       ensureDateStructure(dateKey);
+      applyPillTemplate(dateKey);
+
+      const sections = ALL_SECTIONS;
+      sections.forEach(renderSection);
 
       const notesArea = document.getElementById("general-notes");
       notesArea.value = plannerData[dateKey].notes.general || "";
 
+      renderPillTemplate();
       renderBacklog();
     }
 
@@ -854,9 +1021,21 @@
         .getElementById("general-notes")
         .addEventListener("input", handleNotesInput);
 
+      const pillTemplateForm = document.getElementById("pill-template-form");
+      const pillTemplateList = document.getElementById("pill-template-list");
+
+      if (pillTemplateForm) {
+        pillTemplateForm.addEventListener("submit", handlePillTemplateAdd);
+      }
+      if (pillTemplateList) {
+        pillTemplateList.addEventListener("click", handlePillTemplateClick);
+      }
+
       renderAll();
     });
+
   </script>
 </body>
 </html>
+
 
