@@ -564,6 +564,7 @@
         );
       } catch (e) {}
     }
+
     function loadFromStorage() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -632,9 +633,8 @@
       }
     }
 
-      function applyPillTemplate(dateKey) {
+    function applyPillTemplate(dateKey) {
       if (!pillTemplate.length) return;
-
       if (pillTemplateAppliedDates.includes(dateKey)) return;
 
       ensureDateStructure(dateKey);
@@ -653,6 +653,7 @@
         text: tpl.text,
         time: tpl.time || "",
         done: false,
+        fromTemplate: true, // <- marcar como generadas desde plantilla
       }));
 
       pillTemplateAppliedDates.push(dateKey);
@@ -744,10 +745,10 @@
         actions.className = "backlog-actions";
 
         const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.className = "pill-template-delete";
-        deleteBtn.dataset.id = String(item.id);
-        deleteBtn.textContent = "Quitar";
+          deleteBtn.type = "button";
+          deleteBtn.className = "pill-template-delete";
+          deleteBtn.dataset.id = String(item.id);
+          deleteBtn.textContent = "Quitar";
 
         actions.appendChild(deleteBtn);
 
@@ -808,13 +809,18 @@
         ALL_SECTIONS.forEach((sectionId) => {
           const list = sections[sectionId] || [];
           list.forEach((item) => {
-            if (!item.done) {
-              pending.push({
-                dateKey,
-                sectionId,
-                item,
-              });
+            if (item.done) return;
+
+            // No mandar a pendientes las pastillas diarias generadas por plantilla
+            if (sectionId === "pills" && item.fromTemplate) {
+              return;
             }
+
+            pending.push({
+              dateKey,
+              sectionId,
+              item,
+            });
           });
         });
       }
@@ -1033,9 +1039,6 @@
 
       renderAll();
     });
-
   </script>
 </body>
 </html>
-
-
